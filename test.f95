@@ -3,14 +3,16 @@ program test
 use ft_blas
 implicit none
 integer :: i
-double precision :: a(6,5) = reshape( (/ (i, i=1,30) /) , (/ 6,5 /))
-double precision, dimension(5,3) :: b = reshape( (/ (i*2, i=1,15) /), (/ 5, 3/))
-double precision, dimension(6,3) :: d = 0
+
+double precision, dimension(2048, 2048) :: a, b, c
 
 
-call ft_dgemm(a, b, d, 2)
+call random_number(a)
+call random_number(b)
+
+call ft_dgemm(a, b, c, 3)
 ! test the result of ft_dgemm against the correct result by matmul function
 
-print *, maxval(d - matmul(a,b))
+print *, maxval(c - matmul(a,b))
 
 end program test

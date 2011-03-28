@@ -12,7 +12,7 @@ integer                         :: m,k,n
 integer                         :: i,j
 double precision, parameter     :: one = 1.0D+0, zero = 0.0D+0
 double precision, allocatable   :: ac(:,:), br(:,:), cf(:,:)
-
+real :: t_start, t_end
 !assuming a, b are of shapes (m, k) and (k, n)
 m = size(a, 1); k = size(a, 2); n = size(b, 2)
 
@@ -28,7 +28,10 @@ do i=1,k,s
     ! artificial corruption
     cf(i,i) = 2001.d+0
     ! check and recover
-    call check(cf)
+    call cpu_time(t_start)
+    call check()
+    call cpu_time(t_end)
+    print *, 'check takes ', t_end-t_start, ' seconds'
     ! perform the rank-s update by calling dgemm
     j = i + s - 1
     t = s
@@ -36,24 +39,23 @@ do i=1,k,s
         j = k
         t = k - i + 1
     endif
-    call dgemm('n', 'n', m+1, n+1, t, one, ac(:, i:j), m+1, br(i:j,:), t, one, cf, m+1)
+    call cpu_time(t_start)
     !cf = cf + matmul(ac(:, i:j), br(i:j, :))
+    call dgemm('n', 'n', m+1, n+1, t, one, ac(:, i:j), m+1, br(i:j,:), t, one, cf, m+1)
+    call cpu_time(t_end)
+    print *, 'matmul takes ', t_end - t_start, ' seconds'
 end do
 
 c = cf(1:m, 1:n)
 deallocate(ac, br, cf)
-end subroutine ft_dgemm
-
-subroutine check(cf)
+contains
+subroutine check()
 implicit none
-    double precision, intent(inout) :: cf(:, :)
     double precision :: dr, dc, drr, dcc
     integer ::  ii, jj, iii, jjj
     integer :: rowfail , colfail 
-    integer :: m, n
 
     rowfail=0;colfail=0;iii=0;jjj=0
-    m = size(cf, 1) -1; n = size(cf, 2) -1
 
     ! I want to ensure that if C didn't pass this test
     ! then there MUST be something wrong that probably
@@ -115,6 +117,7 @@ end subroutine check
 subroutine fail
     print *, 'fatal error: cannot recover. need complete recomputation'
 end subroutine fail
+end subroutine ft_dgemm
 
 end module ft_blas
 
