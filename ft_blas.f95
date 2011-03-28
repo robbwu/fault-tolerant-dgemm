@@ -17,7 +17,8 @@ real :: t_start, t_end
 m = size(a, 1); k = size(a, 2); n = size(b, 2)
 
 ! construct threshold distinguishing from roundoff error
-tau = max(m, n, k) * epsilon(tau) * maxval(a) * maxval(b)
+!tau = max(m, n, k) * epsilon(tau) * maxval(a) * maxval(b)
+tau = 1.0d-05
 
 allocate(ac(m+1,k), br(k, n+1), cf(m+1, n+1))
 ac(1:m,:) = a; br(:, 1:n) = b; cf(1:m, 1:n) = c
@@ -51,62 +52,56 @@ deallocate(ac, br, cf)
 contains
 subroutine check()
 implicit none
-    double precision :: dr, dc, drr, dcc
-    integer ::  ii, jj, iii, jjj
-    integer :: rowfail , colfail 
+    double precision :: dr, dc
+    integer ::  ii, jj
+    logical :: rowfail, colfail
+    rowfail = .false.; colfail = .false.
 
-    rowfail=0;colfail=0;iii=0;jjj=0
-
-    ! I want to ensure that if C didn't pass this test
-    ! then there MUST be something wrong that probably
-    ! requires a complete recomputation
-
+    ! simple test, assume only one element corrupted
     ! detect and locate the faults
     do ii = 1,m+1
-        drr = (cf(ii, n+1) - sum(cf(ii, 1:n)))
-        if ( abs(drr) > tau ) then
-            rowfail = rowfail + 1
-            iii = ii
-            dr = drr
+        dr = (cf(ii, n+1) - sum(cf(ii, 1:n)))
+        if ( abs(dr) > tau ) then
+            rowfail = .true.
+            exit
         endif
     end do
     do jj = 1,n+1
-        dcc = cf(m+1, jj) - sum(cf(1:m, jj)) 
-        if ( abs(dcc) > tau ) then
-            colfail = colfail + 1
-            jjj = jj
-            dc = dcc
+        dc = cf(m+1, jj) - sum(cf(1:m, jj)) 
+        if ( abs(dc) > tau ) then
+            colfail = .true.
+            exit
         endif
     end do
     ! attempt to recover or signaling failure
-    if (rowfail == 1 .and. colfail == 1) then
-        if (iii <= m .and. jjj <= n) then
+    if (rowfail  .and. colfail ) then
+        if (ii <= m .and. jj <= n) then
             if (abs(dr-dc) <= tau) then
-                cf(iii, jjj) = cf(iii, jjj) + dr
+                cf(ii, jj) = cf(ii, jj) + dr
             else
-                call fail
+                call fail(1)
             endif
-        elseif (iii == m+1 .and. jjj == n+1) then
+        elseif (ii == m+1 .and. jj == n+1) then
             if (abs(dr-dc) <= tau) then
-                cf(iii, jjj) = cf(iii, jjj) - dr
+                cf(ii, jj) = cf(ii, jj) - dr
             else
-                call fail
+                call fail(2)
             endif
-        elseif (iii == m+1 .and. jjj <= n) then
+        elseif (ii == m+1 .and. jj <= n) then
             if (abs(dc+dr) <= tau) then
-                cf(iii,jjj) = cf(iii,jjj) + dr
+                cf(ii,jj) = cf(ii,jj) + dr
             else
-                call fail
+                call fail(3)
             endif
         else
             if (abs(dc+dr) <= tau) then
-                cf(iii,jjj) = cf(iii,jjj) + dc
+                cf(ii,jj) = cf(ii,jj) + dc
             else
-                call fail
+                call fail(4)
             endif
         endif
-    elseif (rowfail > 0 .or. colfail > 0) then
-        call fail
+    elseif (rowfail .or. colfail ) then
+        call fail(5)
     endif
 
 
@@ -114,8 +109,9 @@ end subroutine check
 
  !in practical situation this subroutine should abort the current
  !computation and start over again
-subroutine fail
-    print *, 'fatal error: cannot recover. need complete recomputation'
+subroutine fail(i)
+    integer, intent(in) :: i
+    print *, 'fatal error: cannot recover. need complete recomputation', i
 end subroutine fail
 end subroutine ft_dgemm
 
