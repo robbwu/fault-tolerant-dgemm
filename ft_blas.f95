@@ -18,7 +18,7 @@ double precision, intent(inout) :: c(:,:), a(:,:), b(:, :)
 integer, intent(in)             :: s
 double precision                :: tau
 integer                         :: m,k,n
-integer                         :: i,j
+integer                         :: i,j, iters
 real                            :: t_start, t_end, cktime
 m = size(a, 1)-1; k = size(a, 2); n = size(b, 2)-1
 ! initialize checksum row/column
@@ -27,16 +27,15 @@ c(m+1,:) = sum(c(1:m, :), dim=1); c(:, n+1) = sum(c(:, 1:n), dim=2)
 ! threshold to distinguish faults from normal roundoff error
 tau = max(m, n, k) * epsilon(tau) * infnorm(a) * infnorm(b)
 cktime = 0.0  ! checktime
+iters = 0
 do i=1,k-mod(k,s),s
-    !c(i,i) = 2001.d+0
+    c(i, i) = 2001.d+0
     call cpu_time(t_start)
     call check()
     call cpu_time(t_end)
-    if (i == 1) then
-        print *, 'a typical check/recover procedure takes', t_end-t_start, 's'
-    endif
     cktime = cktime + t_end - t_start
     call dgemm('n', 'n', m+1, n+1, s, one, a(:, i:i+s-1), m+1, b(i:i+s-1,:), s, one, c, m+1)
+    iters = iters + 1
 end do
 j = i + s
 if (j <= k) then
@@ -45,9 +44,10 @@ if (j <= k) then
     call cpu_time(t_end)
     cktime = cktime + t_end - t_start
     call dgemm('n', 'n', m+1, n+1, k-i, one, a(:, i+1:k), m+1, b(i+1:k, :), k-i, one, c, m+1)
-    print *, 'a typical rank-s update dgemm takes ', t_end - t_start, ' seconds'
+    iters = iters + 1
 end if
 print *, 'time spend on check/recover', cktime
+print *, 'one average check/recover on average', cktime/iters
 contains
 
 
@@ -122,23 +122,27 @@ implicit none
     double precision, intent(inout) :: c(:,:)
     integer, intent(in) :: s
     integer :: m, n, k
-    integer :: i, j
-    real :: t_start, t_end
+    integer :: i, j, iters
+    real :: t_start, t_end, udtime
 
+    iters = 0
+    udtime = 0.0 
     m = size(a, 1); k = size(a, 2); n = size(b, 2)
     do i = 1, k-mod(k,s), s
         call cpu_time(t_start)
         call dgemm('n', 'n', m, n, s, one, a(:, i:i+s-1), m, b(i:i+s-1,:), s, one, c, m)
         call cpu_time(t_end)
-        if (i==1) then
-            print *, 'typical one rank-k update taks', t_end-t_start, 's'
-        end if
-
+        iters = iters + 1
+        udtime = udtime + t_end - t_start
     enddo
     j = i + s
     if (j <= k) then
         call dgemm('n', 'n', m, n, j, one, a(:, i+1:k), m, b(i+1:k,  :), j, one, c, m) 
+        iters = iters + 1
+        udtime = udtime + t_end - t_start
     end if
+    print * , 'one rank-128 update', udtime/ iters
+    print *, 'total rank-128 update', udtime
 end subroutine block_dgemm 
 end module ft_blas
 

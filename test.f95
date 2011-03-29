@@ -28,10 +28,7 @@ call dgemm('n', 'n', m, m, m, 1.0d+0, aa, m, bb, m, 0.0d+0, d, m)
 call cpu_time(t_end)
 print *, 'standard dgemm takes ', t_end-t_start, ' seconds'
 
-call cpu_time(t_start)
 call block_dgemm(aa, bb, e, 128)
-call cpu_time(t_end)
-print *, 'rank-s dgemm takes ', t_end-t_start, ' seconds'
 
 
 print *, 'max error of ft_dgemm', maxval( abs(c(1:m, 1:m) - d))
